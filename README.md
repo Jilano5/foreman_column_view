@@ -1,11 +1,21 @@
-**Note**
-The plugin's functionality was integrated in Foreman itself with version 3.5, making it obsolete.
-
 # foreman\_column\_view
 
-A small plugin to showcase the awesome [Deface](https://github.com/spree/deface)
-library. It simply adds a column to the Hosts list or properties table. It also
-serves as a simple example of including a new Helper in the plugin.
+A small plugin that adds columns, configured in a settings file, to the hosts
+list, and rows to the host properties.
+
+Foreman 3.5 added a column selector to the hosts list, but no way to define
+your own columns: this plugin adds them.
+
+With Foreman 3.19 the columns are available on:
+
+* the hosts list, both the new (React) page and the legacy one. They are listed
+  in the "Custom columns" group of the column selector, shown by default, and
+  included in the CSV export (except columns using `:eval_content`);
+* the host details page: rows configured with `:view: :hosts_properties` are
+  shown in a "Custom properties" card of the Details tab (and in the Properties
+  table of the legacy host page);
+* the API: `GET /api/hosts` and `GET /api/hosts/:id` return a `column_view`
+  object holding the value of every column for the host.
 
 ## Compatibility
 
@@ -13,7 +23,8 @@ serves as a simple example of including a new Helper in the plugin.
 | --------------- | --------------:|
 | <= 1.15         | ~> 0.3         |
 | == 1.16         | untested       |
-| >= 1.17         | ~> 0.4         |
+| >= 1.17, < 3.5  | ~> 0.4         |
+| >= 3.19         | ~> 1.0         |
 
 # Installation
 
@@ -27,6 +38,10 @@ gem 'foreman_column_view'
 Update Foreman with the new gems:
 
     bundle update foreman_column_view
+
+The plugin contains JavaScript, compiled along with the Foreman assets: on a
+source install, rebuild them (`npm install` then `bundle exec rake webpack:compile`
+from the Foreman directory).
 
 # Configuration
 
@@ -49,8 +64,19 @@ massively useful. To set your own choice of column, add this to Foreman's plugin
 ```
 
 `title` is an arbitrary string which is displayed as the column header. `content` is
-a method call to the `Host` object, using `host.send`. In these examples `facts_hash`
+a method call to the `Host` object, using `host.public_send`. In these examples `facts_hash`
 and `params` are method calls to `Host` returning hash values.
+
+`after` is the key of the column after which the new one is placed: a core column
+(`power_status`, `name`, `os_title`, `owner`, `hostgroup`, `organization`, `location`,
+`boot_time`, `last_report`, `comment`, `ip`, `ip6`, `mac`, `model`, ...) or another
+column of this plugin (`name1` above). Columns with an unknown `after` are added at
+the end. The position can also be given explicitly, with `:priority` on the legacy
+hosts list (core columns use 100, 200, ...) and `:weight` on the new one (see the
+weights in `lib/foreman_column_view/columns.rb`).
+
+The column selector refers to the columns as `fcv_<name>` (`fcv_name1` above). Users
+who already saved a column selection must select the new columns there to see them.
 
 ```yaml
 :column_view:
@@ -83,7 +109,7 @@ not work well when the Foreman language is switched).  An example configuration:
     :view: :hosts_properties
 ```
 
-You can also control the width of the added column by giving a value to the `:width`
+On the legacy hosts list, you can also control the width of the added column by giving a value to the `:width`
 attribute. If the width is not set, the default is set to 10%. Note that the original
 host list already has 100% width set, so adding more columns will cause other columns
 to resize, which may cause some of the table layout to break a bit. For example:
@@ -98,10 +124,13 @@ to resize, which may cause some of the table layout to break a bit. For example:
 ```
 
 If you need to add information not readily available in a host, you can add information that
-will be evaluated on runtime by adding `:eval_content: true` to your additional row.
+will be evaluated on runtime by adding `:eval_content: true` to your additional row or column.
+The code sees the host as `host` and can use the Rails view helpers; its result is
+HTML-escaped unless it is marked safe (as `link_to` results are).
 Also, some times you do not want to show the additional row if a certain condition is not met,
 in order to show that row conditionally, add `:conditional: :condition_symbol` to your configuration,
-and that conditional will be executed on your host.
+and that conditional will be executed on your host. Columns of the hosts list are left empty
+when the condition is not met.
 
 As an example, the following yaml shows a link to a custom URL if the method host.bmc_available? is true.
 
@@ -127,6 +156,7 @@ only read at startup.
 * Add plugin settings to the Settings UI
 * Make the column sortable
 * Support adding data to other pages
+* Translate the column titles
 
 # Copyright
 

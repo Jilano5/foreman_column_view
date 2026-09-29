@@ -9,18 +9,18 @@ Gem::Specification.new do |s|
   s.version     = ForemanColumnView::VERSION
   s.authors = ["Greg Sutcliffe"]
   s.email = "greg.sutcliffe@gmail.com"
-  s.description = "Displays an additional column in the Foreman Hosts view
-  and/or additional entries in the Host show page"
+  s.description = "Displays additional columns in the Foreman hosts list
+  and/or additional entries in the host details page"
   s.extra_rdoc_files = [
     "LICENSE",
     "README.md"
   ]
-  s.files = Dir["{app,extra,config,db,lib}/**/*"] + ["LICENSE", "Rakefile", "README.md"]
+  s.files = Dir["{app,extra,config,db,lib,webpack}/**/*", "public/webpack/**/*"] + ["LICENSE", "Rakefile", "README.md", "package.json"]
   s.test_files = Dir["test/**/*"]
   s.homepage = "https://github.com/theforeman/foreman_column_view"
   s.license = "GPL-3.0"
   s.summary = "Column View Plugin for Foreman"
 
-  s.add_dependency "deface", "< 2.0"
+  s.required_ruby_version = ">= 2.7", "< 4"
 end
 

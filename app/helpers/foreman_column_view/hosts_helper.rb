@@ -1,19 +1,12 @@
 module ForemanColumnView
+  # Kept for configurations whose :eval_content calls these helpers
   module HostsHelper
-
     def fcv_title(column)
-      title = SETTINGS[:column_view][column.to_sym][:title]
-      return title
-    end 
+      ForemanColumnView::Columns.title(column)
+    end
 
     def fcv_content(host, column)
-      content = SETTINGS[:column_view][column.to_sym][:content]
-      if content =~ /(.*)\[(.*)\]/
-        return host.send($1)[$2.gsub(/['"]/,'')]
-      else
-        return host.send(content)
-      end
-    end 
-
+      ForemanColumnView::Columns.raw_value(host, column)
+    end
   end
 end
