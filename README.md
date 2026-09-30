@@ -29,14 +29,48 @@ Foreman 3.19 shows the new React pages by default. To use the legacy ones, set
 
 # Installation
 
-The plugin is not published on rubygems.org: build the gem from this
-repository (it only needs Ruby, not Foreman):
+## Building the gem
 
-    gem build foreman_column_view.gemspec
+The plugin is not published on rubygems.org, so build the gem from this
+repository. The plugin is Ruby only: the build needs Ruby and git, but no
+Foreman checkout, Node.js or `bundle install`.
 
-On a Debian package based install, copy `foreman_column_view-<version>.gem` to
-`/usr/share/foreman/vendor/cache/`, then declare it in
-`/usr/share/foreman/bundler.d/Gemfile.local.rb`:
+1. Set the new version in `lib/foreman_column_view/version.rb` (e.g.
+   `VERSION = "1.0.1"`), commit and push. Each build needs a new version:
+   Bundler would keep using an already installed gem with the same version.
+2. Build the gem from a clean checkout of the branch:
+
+       git clone -b foreman-3.19 https://github.com/Jilano5/foreman_column_view.git
+       cd foreman_column_view
+       gem build foreman_column_view.gemspec
+
+   This creates `foreman_column_view-<version>.gem` in the current directory.
+3. Optionally, check its content (only `app/`, `lib/`, `LICENSE`, `Rakefile`
+   and `README.md` are expected):
+
+       gem spec foreman_column_view-<version>.gem files
+
+## Deploying on our Foreman servers
+
+The Foreman servers are managed by Puppet (`profile::foreman::foreman` in the
+puppet-control-repo), which only installs the gem it finds on the share:
+
+1. Upload `foreman_column_view-<version>.gem` to the share, next to the other
+   Foreman installation files:
+   `https://share.ovh.exchange/Software/Foreman/Install/foreman_column_view/`
+   (`${lookup('base::share_software_URL')}/Foreman/Install/foreman_column_view/`
+   in Puppet).
+2. Set the new version in the Puppet profile, so that Puppet downloads the
+   gem, installs it on the Foreman servers and restarts Foreman.
+
+A gem that is not uploaded to the share is not installed: building it is not
+enough.
+
+## Manual installation
+
+To install the gem by hand on a Debian package based install, copy
+`foreman_column_view-<version>.gem` to `/usr/share/foreman/vendor/cache/`,
+then declare it in `/usr/share/foreman/bundler.d/Gemfile.local.rb`:
 
 ```ruby
 gem 'foreman_column_view', '1.0.0'
