@@ -3,35 +3,20 @@ module ForemanColumnView
     extend ActiveSupport::Concern
 
     module Overrides
-      # Extend core HostsHelper to add rows to Properties on hosts/show
+      # Extend core HostsHelper to add rows to Properties on the legacy hosts/show
       def overview_fields(host)
         fields = super
-        return fields unless SETTINGS[:column_view]
+        cache = {}
 
-        valid_views = [:hosts_properties]
-        SETTINGS[:column_view].reject { |k,v| !valid_views.include?(v[:view]) }.keys.sort.map do |k|
-          after       = SETTINGS[:column_view][k.to_sym][:after]
-          conditional = SETTINGS[:column_view][k.to_sym][:conditional]
-          if conditional.present?
-            method = conditional[0].to_sym
-            args   = conditional.drop(1)
-          end
-
-          begin
-            next unless (conditional.present? && host.respond_to?(method) && host.send(method, *args)) ||
-              (conditional.nil?)
-          rescue ArgumentError
-            Rails.logger.warn("Foreman_column_view: Your are supplying the wrong kind/number of arguments to your conditional method. Host #{host} , method - #{method} - arguments - #{args.join(', ')} ")
-            next
-          end
+        ForemanColumnView::Columns.for_view(:hosts_properties).each do |name, opts|
+          next unless ForemanColumnView::Columns.visible?(host, name)
 
           # This won't work well with i18n, use row numbers instead
-          after = fields.find_index { |r| r[0].include? after } unless after.is_a? Fixnum
-          eval_content = SETTINGS[:column_view][k.to_sym][:eval_content]
-          content = eval_content ? eval(SETTINGS[:column_view][k.to_sym][:content]) :
-            fcv_content(host, k)
+          after = opts[:after]
+          after = fields.find_index { |row| row[0].to_s.include?(after.to_s) }&.succ unless after.is_a?(Integer)
+          content = ForemanColumnView::Columns.safe_value(self, host, name, cache)
 
-          fields.insert(after || -1, [fcv_title(k), content])
+          fields.insert(after&.clamp(0, fields.size) || -1, [ForemanColumnView::Columns.title(name), content])
         end
 
         fields
@@ -41,6 +26,5 @@ module ForemanColumnView
     included do
       prepend Overrides
     end
-
   end
 end

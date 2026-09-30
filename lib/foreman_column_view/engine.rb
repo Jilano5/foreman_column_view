@@ -1,24 +1,26 @@
-require 'deface'
+require 'foreman_column_view/columns'
 
 module ForemanColumnView
   class Engine < ::Rails::Engine
     engine_name 'foreman_column_view'
 
-    config.autoload_paths += Dir['#{config.root}/app/helpers']
-    config.autoload_paths += Dir['#{config.root}/app/overrides']
-
     initializer 'foreman_column_view.register_plugin', :before => :finisher_hook do |app|
-      Foreman::Plugin.register :foreman_column_view do
-        requires_foreman '>= 1.17'
+      app.reloader.to_prepare do
+        Foreman::Plugin.register :foreman_column_view do
+          requires_foreman '>= 3.19'
+
+          # Columns of the legacy hosts index page
+          extend_page('hosts/_list') { |context| ForemanColumnView::Columns.register_pagelets(context) }
+        end
       end
     end
 
-    initializer 'foreman_column_view.helper' do |app|
-      ActionView::Base.send :include, ForemanColumnView::HostsHelper
-
-      # Extend core HostHelper to add rows to Properties on hosts/show
-      ::HostsHelper.send :include, ForemanColumnView::HostsHelperExtension
+    config.to_prepare do
+      # Extend core HostsHelper to add rows to Properties on the legacy hosts/show
+      ::HostsHelper.include ForemanColumnView::HostsHelper
+      ::HostsHelper.include ForemanColumnView::HostsHelperExtension
+    rescue StandardError => e
+      Rails.logger.warn "ForemanColumnView: skipping engine hook (#{e})"
     end
-
   end
 end

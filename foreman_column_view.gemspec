@@ -9,8 +9,8 @@ Gem::Specification.new do |s|
   s.version     = ForemanColumnView::VERSION
   s.authors = ["Greg Sutcliffe"]
   s.email = "greg.sutcliffe@gmail.com"
-  s.description = "Displays an additional column in the Foreman Hosts view
-  and/or additional entries in the Host show page"
+  s.description = "Displays additional columns in the Foreman legacy hosts list
+  and/or additional entries in the legacy host page"
   s.extra_rdoc_files = [
     "LICENSE",
     "README.md"
@@ -21,6 +21,6 @@ Gem::Specification.new do |s|
   s.license = "GPL-3.0"
   s.summary = "Column View Plugin for Foreman"
 
-  s.add_dependency "deface", "< 2.0"
+  s.required_ruby_version = ">= 2.7", "< 4"
 end
 

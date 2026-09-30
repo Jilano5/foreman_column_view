@@ -1,11 +1,22 @@
-**Note**
-The plugin's functionality was integrated in Foreman itself with version 3.5, making it obsolete.
-
 # foreman\_column\_view
 
-A small plugin to showcase the awesome [Deface](https://github.com/spree/deface)
-library. It simply adds a column to the Hosts list or properties table. It also
-serves as a simple example of including a new Helper in the plugin.
+A small plugin that adds columns, configured in a settings file, to the hosts
+list, and rows to the host properties.
+
+Foreman 3.5 added a column selector to the hosts list, but no way to define
+your own columns: this plugin adds them.
+
+With Foreman 3.19 the plugin works on the legacy pages only:
+
+* the legacy hosts list (`/hosts`): the columns are listed in the "Custom
+  columns" group of the column selector, shown by default, and included in the
+  CSV export (except columns using `:eval_content`);
+* the legacy host page: rows configured with `:view: :hosts_properties` are
+  added to the Properties table.
+
+Foreman 3.19 shows the new React pages by default. To use the legacy ones, set
+*Show New Host Overview Page* (`new_hosts_page`) and *New host details UI*
+(`host_details_ui`) to *No* in Administer > Settings > General.
 
 ## Compatibility
 
@@ -13,20 +24,64 @@ serves as a simple example of including a new Helper in the plugin.
 | --------------- | --------------:|
 | <= 1.15         | ~> 0.3         |
 | == 1.16         | untested       |
-| >= 1.17         | ~> 0.4         |
+| >= 1.17, < 3.5  | ~> 0.4         |
+| >= 3.19         | ~> 1.0         |
 
 # Installation
 
-Require the gem in Foreman (you may need extra dependencies such as libxml or libxslt
-to build the nokogiri dependency)
+## Building the gem
 
-```yaml
-gem 'foreman_column_view'
+The plugin is not published on rubygems.org, so build the gem from this
+repository. The plugin is Ruby only: the build needs Ruby and git, but no
+Foreman checkout, Node.js or `bundle install`.
+
+1. Set the new version in `lib/foreman_column_view/version.rb` (e.g.
+   `VERSION = "1.0.1"`), commit and push. Each build needs a new version:
+   Bundler would keep using an already installed gem with the same version.
+2. Build the gem from a clean checkout of the branch:
+
+       git clone -b foreman-3.19 https://github.com/Jilano5/foreman_column_view.git
+       cd foreman_column_view
+       gem build foreman_column_view.gemspec
+
+   This creates `foreman_column_view-<version>.gem` in the current directory.
+3. Optionally, check its content (only `app/`, `lib/`, `LICENSE`, `Rakefile`
+   and `README.md` are expected):
+
+       gem spec foreman_column_view-<version>.gem files
+
+## Deploying on our Foreman servers
+
+The Foreman servers are managed by Puppet (`profile::foreman::foreman` in the
+puppet-control-repo), which only installs the gem it finds on the share:
+
+1. Upload `foreman_column_view-<version>.gem` to the share, next to the other
+   Foreman installation files:
+   `https://share.ovh.exchange/Software/Foreman/Plugins/foreman_column_view/`
+   (`${lookup('base::share_software_URL')}/Foreman/Plugins/foreman_column_view/`
+   in Puppet).
+2. Set the new version in the Puppet profile, so that Puppet downloads the
+   gem, installs it on the Foreman servers and restarts Foreman.
+
+A gem that is not uploaded to the share is not installed: building it is not
+enough.
+
+## Manual installation
+
+To install the gem by hand on a Debian package based install, copy
+`foreman_column_view-<version>.gem` to `/usr/share/foreman/vendor/cache/`,
+then declare it in `/usr/share/foreman/bundler.d/Gemfile.local.rb`:
+
+```ruby
+gem 'foreman_column_view', '1.0.0'
 ```
 
-Update Foreman with the new gems:
+and install it as the foreman user:
 
-    bundle update foreman_column_view
+    cd /usr/share/foreman
+    runuser -u foreman -- env HOME=/usr/share/foreman bundle install --local
+
+Restart Foreman after the installation and after every configuration change.
 
 # Configuration
 
@@ -49,8 +104,18 @@ massively useful. To set your own choice of column, add this to Foreman's plugin
 ```
 
 `title` is an arbitrary string which is displayed as the column header. `content` is
-a method call to the `Host` object, using `host.send`. In these examples `facts_hash`
+a method call to the `Host` object, using `host.public_send`. In these examples `facts_hash`
 and `params` are method calls to `Host` returning hash values.
+
+`after` is the key of the column after which the new one is placed: a core column
+(`power_status`, `name`, `os_title`, `owner`, `hostgroup`, `organization`, `location`,
+`boot_time`, `last_report`, `comment`, `ip`, `ip6`, `mac`, `model`, ...) or another
+column of this plugin (`name1` above). Columns with an unknown `after` are added at
+the end. The position can also be given explicitly with `:priority` (core columns
+use 100, 200, ...).
+
+The column selector refers to the columns as `fcv_<name>` (`fcv_name1` above). Users
+who already saved a column selection must select the new columns there to see them.
 
 ```yaml
 :column_view:
@@ -98,10 +163,13 @@ to resize, which may cause some of the table layout to break a bit. For example:
 ```
 
 If you need to add information not readily available in a host, you can add information that
-will be evaluated on runtime by adding `:eval_content: true` to your additional row.
+will be evaluated on runtime by adding `:eval_content: true` to your additional row or column.
+The code sees the host as `host` and can use the Rails view helpers; its result is
+HTML-escaped unless it is marked safe (as `link_to` results are).
 Also, some times you do not want to show the additional row if a certain condition is not met,
 in order to show that row conditionally, add `:conditional: :condition_symbol` to your configuration,
-and that conditional will be executed on your host.
+and that conditional will be executed on your host. Columns of the hosts list are left empty
+when the condition is not met.
 
 As an example, the following yaml shows a link to a custom URL if the method host.bmc_available? is true.
 
@@ -127,6 +195,7 @@ only read at startup.
 * Add plugin settings to the Settings UI
 * Make the column sortable
 * Support adding data to other pages
+* Translate the column titles
 
 # Copyright
 
