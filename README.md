@@ -57,8 +57,8 @@ puppet-control-repo), which only installs the gem it finds on the share:
 
 1. Upload `foreman_column_view-<version>.gem` to the share, next to the other
    Foreman installation files:
-   `https://share.ovh.exchange/Software/Foreman/Install/foreman_column_view/`
-   (`${lookup('base::share_software_URL')}/Foreman/Install/foreman_column_view/`
+   `https://share.ovh.exchange/Software/Foreman/Plugins/foreman_column_view/`
+   (`${lookup('base::share_software_URL')}/Foreman/Plugins/foreman_column_view/`
    in Puppet).
 2. Set the new version in the Puppet profile, so that Puppet downloads the
    gem, installs it on the Foreman servers and restarts Foreman.
