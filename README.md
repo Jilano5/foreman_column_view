@@ -6,16 +6,17 @@ list, and rows to the host properties.
 Foreman 3.5 added a column selector to the hosts list, but no way to define
 your own columns: this plugin adds them.
 
-With Foreman 3.19 the columns are available on:
+With Foreman 3.19 the plugin works on the legacy pages only:
 
-* the hosts list, both the new (React) page and the legacy one. They are listed
-  in the "Custom columns" group of the column selector, shown by default, and
-  included in the CSV export (except columns using `:eval_content`);
-* the host details page: rows configured with `:view: :hosts_properties` are
-  shown in a "Custom properties" card of the Details tab (and in the Properties
-  table of the legacy host page);
-* the API: `GET /api/hosts` and `GET /api/hosts/:id` return a `column_view`
-  object holding the value of every column for the host.
+* the legacy hosts list (`/hosts`): the columns are listed in the "Custom
+  columns" group of the column selector, shown by default, and included in the
+  CSV export (except columns using `:eval_content`);
+* the legacy host page: rows configured with `:view: :hosts_properties` are
+  added to the Properties table.
+
+Foreman 3.19 shows the new React pages by default. To use the legacy ones, set
+*Show New Host Overview Page* (`new_hosts_page`) and *New host details UI*
+(`host_details_ui`) to *No* in Administer > Settings > General.
 
 ## Compatibility
 
@@ -28,20 +29,25 @@ With Foreman 3.19 the columns are available on:
 
 # Installation
 
-Require the gem in Foreman (you may need extra dependencies such as libxml or libxslt
-to build the nokogiri dependency)
+The plugin is not published on rubygems.org: build the gem from this
+repository (it only needs Ruby, not Foreman):
 
-```yaml
-gem 'foreman_column_view'
+    gem build foreman_column_view.gemspec
+
+On a Debian package based install, copy `foreman_column_view-<version>.gem` to
+`/usr/share/foreman/vendor/cache/`, then declare it in
+`/usr/share/foreman/bundler.d/Gemfile.local.rb`:
+
+```ruby
+gem 'foreman_column_view', '1.0.0'
 ```
 
-Update Foreman with the new gems:
+and install it as the foreman user:
 
-    bundle update foreman_column_view
+    cd /usr/share/foreman
+    runuser -u foreman -- env HOME=/usr/share/foreman bundle install --local
 
-The plugin contains JavaScript, compiled along with the Foreman assets: on a
-source install, rebuild them (`npm install` then `bundle exec rake webpack:compile`
-from the Foreman directory).
+Restart Foreman after the installation and after every configuration change.
 
 # Configuration
 
@@ -71,9 +77,8 @@ and `params` are method calls to `Host` returning hash values.
 (`power_status`, `name`, `os_title`, `owner`, `hostgroup`, `organization`, `location`,
 `boot_time`, `last_report`, `comment`, `ip`, `ip6`, `mac`, `model`, ...) or another
 column of this plugin (`name1` above). Columns with an unknown `after` are added at
-the end. The position can also be given explicitly, with `:priority` on the legacy
-hosts list (core columns use 100, 200, ...) and `:weight` on the new one (see the
-weights in `lib/foreman_column_view/columns.rb`).
+the end. The position can also be given explicitly with `:priority` (core columns
+use 100, 200, ...).
 
 The column selector refers to the columns as `fcv_<name>` (`fcv_name1` above). Users
 who already saved a column selection must select the new columns there to see them.
@@ -109,7 +114,7 @@ not work well when the Foreman language is switched).  An example configuration:
     :view: :hosts_properties
 ```
 
-On the legacy hosts list, you can also control the width of the added column by giving a value to the `:width`
+You can also control the width of the added column by giving a value to the `:width`
 attribute. If the width is not set, the default is set to 10%. Note that the original
 host list already has 100% width set, so adding more columns will cause other columns
 to resize, which may cause some of the table layout to break a bit. For example:

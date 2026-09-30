@@ -1,23 +1,12 @@
 module ForemanColumnView
   # Reads the :column_view section of the Foreman settings and turns it into
-  # host table columns (legacy pagelets and React hosts index) and host
-  # properties rows.
+  # columns of the legacy hosts list and rows of the legacy host properties.
   module Columns
     DEFAULT_VIEW = :hosts_list
     DEFAULT_WIDTH = '10%'.freeze
     KEY_PREFIX = 'fcv_'.freeze
     CATEGORY_LABEL = 'Custom columns'.freeze
 
-    # Weights of the core columns of the React hosts index page (Foreman 3.19),
-    # used to resolve :after on that page
-    REACT_CORE_WEIGHTS = {
-      'power_status' => 0, 'name' => 50, 'organization' => 75, 'location' => 80,
-      'hostgroup' => 100, 'os_title' => 200, 'owner' => 300, 'boot_time' => 400,
-      'last_report' => 500, 'comment' => 600, 'ip' => 700, 'ip6' => 800, 'mac' => 900,
-      'model' => 1000, 'sockets' => 1100, 'cores' => 1200, 'ram' => 1300, 'virtual' => 1400,
-      'disks_total' => 1500, 'kernel_version' => 1600, 'bios_vendor' => 1700,
-      'bios_release_date' => 1800, 'bios_version' => 1900
-    }.freeze
 
     module_function
 
@@ -95,49 +84,14 @@ module ForemanColumnView
       safe_value(nil, host, name)
     end
 
-    # Values of all the columns for the API, as consumed by the React pages
-    def api_values(view, host)
-      cache = {}
-      all.each_with_object({}) do |(name, opts), result|
-        value = safe_value(view, host, name, cache)
-        next if value.nil?
-
-        result[name] = if opts[:eval_content]
-                         ERB::Util.html_escape(value).to_str
-                       elsif value.is_a?(String) || value.is_a?(Numeric) || value == true || value == false
-                         value
-                       else
-                         value.to_s
-                       end
-      end
-    end
-
-    # Metadata used by webpack/global_index.js to register the React columns
-    def metadata
-      list_weights = positions(for_view(:hosts_list),
-        REACT_CORE_WEIGHTS.map { |key, weight| { key: key, position: weight } }, gap: 100, override: :weight)
-
-      all.map do |name, opts|
-        {
-          name: name,
-          key: key(name),
-          title: title(name),
-          view: (opts[:view] || DEFAULT_VIEW).to_s,
-          html: opts[:eval_content].present?,
-          weight: list_weights[name],
-          after: opts[:after].is_a?(Integer) ? opts[:after] : nil,
-        }.compact
-      end
-    end
-
     # Adds the header and content pagelets of the legacy hosts list
     def register_pagelets(context)
       existing = context.pagelets_at(:hosts_table_column_header)
       columns = for_view(:hosts_list).reject { |name, _| existing.any? { |pagelet| pagelet.opts[:key].to_s == key(name) } }
       return if columns.empty?
 
-      priorities = positions(columns,
-        existing.map { |pagelet| { key: pagelet.opts[:key].to_s, label: pagelet.opts[:label].to_s, position: pagelet.priority } }, gap: 100, override: :priority)
+      column_priorities = priorities(columns,
+        existing.map { |pagelet| { key: pagelet.opts[:key].to_s, label: pagelet.opts[:label].to_s, priority: pagelet.priority } })
 
       context.with_profile :column_view, CATEGORY_LABEL, default: true do
         columns.each do |name, opts|
@@ -147,7 +101,7 @@ module ForemanColumnView
             sortable: false,
             width: opts[:width] || DEFAULT_WIDTH,
             class: 'hidden-tablet hidden-xs',
-            priority: priorities[name],
+            priority: column_priorities[name],
           }
           if defined?(::CsvExporter::ExportDefinition)
             header[:export_data] = ::CsvExporter::ExportDefinition.new(header[:key], label: header[:label],
@@ -157,46 +111,45 @@ module ForemanColumnView
           add_pagelet :hosts_table_column_content,
             key: header[:key],
             class: 'hidden-tablet hidden-xs ellipsis',
-            priority: priorities[name],
+            priority: column_priorities[name],
             callback: ->(host) { ForemanColumnView::Columns.safe_value(self, host, name) }
         end
       end
     end
 
-    # Computes the position (pagelet priority or React weight) of each column
-    # so that it lands right after the column named by :after. Existing
-    # columns are given as [{ key:, label:, position: }]. Columns can refer to
-    # each other, in any order; unresolved ones are appended at the end. The
-    # override option names a setting giving the position explicitly.
-    def positions(columns, existing, gap:, override:)
+    # Computes the pagelet priority of each column so that it lands right
+    # after the column named by :after, unless :priority is given. Existing
+    # columns are given as [{ key:, label:, priority: }]. Columns can refer to
+    # each other, in any order; unresolved ones are appended at the end.
+    def priorities(columns, existing, gap: 100)
       taken = existing.map { |col| col.merge(names: [col[:key], col[:label]].compact.map { |n| n.to_s.downcase }) }
       result = {}
       pending = columns.to_a
 
       place = lambda do |name, position|
         result[name] = position
-        taken << { names: [name.downcase, key(name).downcase], position: position }
+        taken << { names: [name.downcase, key(name).downcase], priority: position }
       end
 
       loop do
         progress = false
         pending = pending.reject do |name, opts|
-          if opts[override].is_a?(Numeric)
-            place.call(name, opts[override])
+          if opts[:priority].is_a?(Numeric)
+            place.call(name, opts[:priority])
             next progress = true
           end
           anchor = taken.find { |col| col[:names].include?(opts[:after].to_s.downcase) }
           next false unless anchor
 
-          following = taken.map { |col| col[:position] }.select { |position| position > anchor[:position] }.min
-          place.call(name, following ? (anchor[:position] + following) / 2.0 : anchor[:position] + gap)
+          following = taken.map { |col| col[:priority] }.select { |priority| priority > anchor[:priority] }.min
+          place.call(name, following ? (anchor[:priority] + following) / 2.0 : anchor[:priority] + gap)
           progress = true
         end
         break if pending.empty? || !progress
       end
 
       pending.each do |name, _opts|
-        place.call(name, (taken.map { |col| col[:position] }.max || 0) + gap)
+        place.call(name, (taken.map { |col| col[:priority] }.max || 0) + gap)
       end
       result
     end

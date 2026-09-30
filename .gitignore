@@ -4,7 +4,4 @@ Gemfile.lock
 .rbenv*
 .rvmrc*
 .ruby-version
-node_modules/
-package-lock.json
-public/webpack/
 *.gem
