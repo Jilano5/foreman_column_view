@@ -78,6 +78,27 @@ module ForemanColumnView
       nil
     end
 
+    # Value of a cell of the hosts list, memoized in the view for the request
+    # so that hidden_in_list? and the cells compute each value only once
+    def list_value(view, host, name)
+      values = view.instance_variable_get(:@fcv_values) || view.instance_variable_set(:@fcv_values, {})
+      values.fetch([host.id, name]) { values[[host.id, name]] = safe_value(view, host, name) }
+    end
+
+    # With :hide_empty, a column of the hosts list is hidden, header included,
+    # when it has no value for any host of the page being rendered (@hosts of
+    # the hosts controller). The decision is memoized in the view so that the
+    # header and every cell of the column agree.
+    def hidden_in_list?(view, name)
+      return false unless options(name)[:hide_empty]
+
+      hidden = view.instance_variable_get(:@fcv_hidden) || view.instance_variable_set(:@fcv_hidden, {})
+      return hidden[name] if hidden.key?(name)
+
+      hosts = view.instance_variable_get(:@hosts)
+      hidden[name] = !hosts.nil? && hosts.none? { |host| list_value(view, host, name).present? }
+    end
+
     # Evaluated content needs a view context, so it is not exported to CSV
     def export_value(host, name)
       return if options(name)[:eval_content]
@@ -95,6 +116,8 @@ module ForemanColumnView
 
       context.with_profile :column_view, CATEGORY_LABEL, default: true do
         columns.each do |name, opts|
+          # Foreman renders a pagelet only when onlyif.call(subject, view) is true
+          shown = ->(_subject, view) { !ForemanColumnView::Columns.hidden_in_list?(view, name) }
           header = {
             key: ForemanColumnView::Columns.key(name),
             label: ForemanColumnView::Columns.title(name),
@@ -102,6 +125,7 @@ module ForemanColumnView
             width: opts[:width] || DEFAULT_WIDTH,
             class: 'hidden-tablet hidden-xs',
             priority: column_priorities[name],
+            onlyif: shown,
           }
           if defined?(::CsvExporter::ExportDefinition)
             header[:export_data] = ::CsvExporter::ExportDefinition.new(header[:key], label: header[:label],
@@ -112,7 +136,8 @@ module ForemanColumnView
             key: header[:key],
             class: 'hidden-tablet hidden-xs ellipsis',
             priority: column_priorities[name],
-            callback: ->(host) { ForemanColumnView::Columns.safe_value(self, host, name) }
+            onlyif: shown,
+            callback: ->(host) { ForemanColumnView::Columns.list_value(self, host, name) }
         end
       end
     end

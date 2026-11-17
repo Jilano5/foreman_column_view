@@ -35,12 +35,23 @@ The plugin is not published on rubygems.org, so build the gem from this
 repository. The plugin is Ruby only: the build needs Ruby and git, but no
 Foreman checkout, Node.js or `bundle install`.
 
+> **Do not re-add webpack or package.json to this plugin.** Foreman core
+> auto-detects a webpack plugin when the gem contains `webpack/index.js`, a
+> `package.json` or a non-empty `public/webpack/` (see
+> `app/registries/foreman/plugin/assets.rb`, `uses_webpack?`). It then
+> injects a module federation remote for the plugin and the browser requests
+> `/webpack/foreman_column_view/foreman_column_view_remoteEntry.js`. If that
+> file is not compiled and shipped with the gem, every page load 404s it,
+> which blocks the React dashboard hydration and slows `/hosts` down (see
+> version 1.0.0). This version is Ruby-only on purpose; keep it that way.
+
 1. Set the new version in `lib/foreman_column_view/version.rb` (e.g.
    `VERSION = "1.0.1"`), commit and push. Each build needs a new version:
    Bundler would keep using an already installed gem with the same version.
-2. Build the gem from a clean checkout of the branch:
+2. Build the gem from a clean checkout of the branch (master holds the
+   merged Foreman 3.19 changes):
 
-       git clone -b foreman-3.19 https://github.com/Jilano5/foreman_column_view.git
+       git clone https://github.com/Jilano5/foreman_column_view.git
        cd foreman_column_view
        gem build foreman_column_view.gemspec
 
@@ -73,7 +84,7 @@ To install the gem by hand on a Debian package based install, copy
 then declare it in `/usr/share/foreman/bundler.d/Gemfile.local.rb`:
 
 ```ruby
-gem 'foreman_column_view', '1.0.0'
+gem 'foreman_column_view', '1.0.2'
 ```
 
 and install it as the foreman user:
@@ -132,6 +143,20 @@ who already saved a column selection must select the new columns there to see th
     :after: last_report
     :content: params['favorite_color']
 
+```
+
+A column of the hosts list can be hidden, header included, when it is empty for every
+host of the displayed page, by adding `:hide_empty: true`. The check is made page by
+page: the column may show on one page and not on the next. It still appears in the
+column selector and in the CSV export.
+
+```yaml
+:column_view:
+  :servername:
+    :title: ServerName
+    :after: name
+    :content: facts_hash['servername']
+    :hide_empty: true
 ```
 
 Additional rows can also be added to the Properties table on the host page by setting
