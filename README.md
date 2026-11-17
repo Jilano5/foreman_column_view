@@ -84,7 +84,7 @@ To install the gem by hand on a Debian package based install, copy
 then declare it in `/usr/share/foreman/bundler.d/Gemfile.local.rb`:
 
 ```ruby
-gem 'foreman_column_view', '1.0.1'
+gem 'foreman_column_view', '1.0.2'
 ```
 
 and install it as the foreman user:
@@ -143,6 +143,20 @@ who already saved a column selection must select the new columns there to see th
     :after: last_report
     :content: params['favorite_color']
 
+```
+
+A column of the hosts list can be hidden, header included, when it is empty for every
+host of the displayed page, by adding `:hide_empty: true`. The check is made page by
+page: the column may show on one page and not on the next. It still appears in the
+column selector and in the CSV export.
+
+```yaml
+:column_view:
+  :servername:
+    :title: ServerName
+    :after: name
+    :content: facts_hash['servername']
+    :hide_empty: true
 ```
 
 Additional rows can also be added to the Properties table on the host page by setting
